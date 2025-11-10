@@ -1,0 +1,10 @@
+# get the current masses of the bodies (num_assets, num_bodies)
+masses = self.asset.root_physx_view.get_masses()
+
+
+# set the mass into the physics simulation
+self.asset.root_physx_view.set_masses(masses, env_ids)
+
+
+# all tensors are CPU
+root_physx_view: omni.physics.tensors.impl.api.ArticulationView 说明是isaacsim的API，实际上抄的是isaacsim的rigidprim的API，不是articulation的

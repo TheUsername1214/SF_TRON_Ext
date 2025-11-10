@@ -11,7 +11,7 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 import numpy as np
 
 
-def env_initialization(file_path, dt, sub_step, agents_num, device):
+def env_setup(file_path, dt, sub_step, agents_num, device):
     """初始化Isaac Sim 世界"""
     sub_terrains = {}
     iterations = 5

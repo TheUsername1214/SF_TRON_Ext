@@ -62,10 +62,10 @@ class Isaac_Lab_Environment:
         self.start_time = t.time()
 
         """初始化Isaac Sim环境"""
-        from ..Env.Robot_Initialization import env_initialization
-        self.sim, self.scene = env_initialization(self.file_path, self.dt, self.sub_step, self.agents_num, self.device)
+        from ..Env.Scene_Initialization import env_setup
+        self.sim, self.scene = env_setup(self.file_path, self.dt, self.sub_step, self.agents_num, self.device)
 
-    def prim_initialization(self, agent_index):
+    def prim_initialization(self, agent_index=None,reset_all = False):
         """
         :param agent_index:  哪个序号的机器人挂了
         :return:
@@ -77,6 +77,9 @@ class Isaac_Lab_Environment:
         传感器数据会自动更新
         该函数在环境初始化和机器人挂掉时调用
         """
+        if reset_all:
+            agent_index = torch.arange(self.agents_num, device=self.device)
+
         num_agents = len(agent_index)
         if num_agents == 0:
             return
@@ -114,53 +117,7 @@ class Isaac_Lab_Environment:
         if not self.train:  # 当你play的时候，设置速度指令
             self.vel_cmd[:, 0] = -1.3
 
-    def prim_initialization_all(self):
-        """
-        :param agent_index:  哪个序号的机器人挂了
-        :return:
-        重置指定序号机器人的位置和速度
-        位置重置为初始位置，速度重置为随机小速度
-        速度指令重置为随机值
-        时间重置为0
-        额外参数重置为0 比如power，action 等
-        传感器数据会自动更新
-        该函数在环境初始化和机器人挂掉时调用
-        """
-        agent_index = torch.arange(self.agents_num, device=self.device)
-        num_agents = len(agent_index)
 
-        # 生成随机初始化数据
-        initial_linear_vel = self.initial_body_linear_vel_range * (
-                2 * torch.rand(num_agents, 3, device=self.device) - 1)
-        initial_angular_vel = self.initial_body_angular_vel_range * (
-                2 * torch.rand(num_agents, 3, device=self.device) - 1)
-        initial_joint_pos = self.initial_joint_pos_range * (2 * torch.rand(num_agents, 8, device=self.device) - 1)
-        initial_joint_vel = self.initial_joint_vel_range * (2 * torch.rand(num_agents, 8, device=self.device) - 1)
-        initial_body_v_w = torch.concatenate((initial_linear_vel, initial_angular_vel), dim=1)
-
-        # 设置速度命令和时间
-        """重新初始化额外机器人参数"""
-        self.vel_cmd[agent_index, 0] = 0
-        self.time[agent_index] = 0
-        self.L_feet_air_time[agent_index] = 0
-        self.R_feet_air_time[agent_index] = 0
-        self.action[agent_index] = 0
-
-        # 获取prim并设置身体速度
-        self.scene["robot"].reset(env_ids=agent_index.cpu().tolist())
-        root_state = self.scene["robot"].data.default_root_state[agent_index].clone()
-        root_state[:, :3] += self.scene.env_origins[agent_index]
-        root_state[:, 2] += self.initial_height
-        self.scene["robot"].write_root_pose_to_sim(root_state[:, :7], env_ids=agent_index)
-        self.scene["robot"].write_root_velocity_to_sim(root_velocity=initial_body_v_w, env_ids=agent_index)
-        self.scene["robot"].write_joint_state_to_sim(position=initial_joint_pos,
-                                                     velocity=initial_joint_vel,
-                                                     env_ids=agent_index)
-        self.scene.write_data_to_sim()
-        self.scene.update(dt=0)
-
-        if not self.train:  # 当你play的时候，设置速度指令
-            self.vel_cmd[:, 0] = -1.3
 
     """-------------------以上均为初始化代码-----------------------"""
     """-------------------以上均为初始化代码-----------------------"""

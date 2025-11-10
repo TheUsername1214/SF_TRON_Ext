@@ -12,7 +12,7 @@ if not train:
 env = Isaac_Lab_Environment(Env_Config, Robot_Config, PPO_Config)
 import torch
 
-env.prim_initialization_all()
+env.prim_initialization(reset_all=True)
 for epi in range(episode):
     print(f"===================episode: {epi}===================")
     for step in range(maximum_step):
