@@ -304,7 +304,7 @@ class Isaac_Lab_Environment:
 
         if_tracking_vel = (self.vel_cmd == 1)
 
-        reward_vel_forward = -1 * torch.abs(vel_forward - 1.5 * if_tracking_vel) + 1.5
+        reward_vel_forward = -1 * torch.abs(vel_forward - 1 * if_tracking_vel) + 1
         reward_vel_lateral = -0.5 * torch.abs(vel_lateral - 0)
         reward = reward_vel_lateral + reward_vel_forward
 
@@ -360,7 +360,7 @@ class Isaac_Lab_Environment:
         flying = (~self.next_L_foot_contact_situation) & (~self.next_R_foot_contact_situation)
 
         walking_phase_reward = 0.2 * single_support.float()
-        walking_phase_reward += 0.2 * flying.float()
+        walking_phase_reward += 0 * flying.float()
         walking_phase_reward += -0.3 * double_support.float()
 
         walking_phase_reward *= (self.vel_cmd == 1)

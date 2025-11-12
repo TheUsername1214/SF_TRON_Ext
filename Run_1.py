@@ -20,11 +20,11 @@ for epi in range(episode):
     for step in range(maximum_step):
         """获取当前状态"""
 
-        # if not train:
-        #     env.vel_cmd[:] = 1
-        #     if epi>3:
-        #         env.vel_cmd[:] = 0
-        #         print("stop!!!!!!!")
+        if not train:
+            env.vel_cmd[:] = 1
+            if epi>2:
+                env.vel_cmd[:] = 0
+                print("stop!!!!!!!")
         state = env.get_current_observations()
         state[:,basic_state:] = 0 # basic state 之后就是地图信息，第一阶段机器人盲走
 

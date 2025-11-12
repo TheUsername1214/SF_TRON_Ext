@@ -1,6 +1,6 @@
 class Env_Config:
     class EnvParam:  # 训练环境的参数
-        agents_num = 2000
+        agents_num = 2500
         agents_num_in_play = 10
         file_path = "C:/Users/21363/PycharmProjects/Isaac_Lab/SF_TRON_Ext/model/Robot_Model/SF_TRON1A.usd"  # abs path, not relative path
         dt = 0.02
@@ -25,10 +25,10 @@ class Robot_Config:
 
     class InitialState:
         initial_height = 0.85
-        initial_body_linear_vel_range = 0.1
-        initial_body_angular_vel_range = 0.1
-        initial_joint_pos_range = 0.1
-        initial_joint_vel_range = 0.1
+        initial_body_linear_vel_range = 0.2
+        initial_body_angular_vel_range = 0.2
+        initial_joint_pos_range = 0.2
+        initial_joint_vel_range = 0.2
         initial_joint_angle = [0, 0,
                                -0, 0,
                                0, 0,
