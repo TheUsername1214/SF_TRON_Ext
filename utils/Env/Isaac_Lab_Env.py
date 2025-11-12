@@ -36,7 +36,7 @@ class Isaac_Lab_Environment:
         self.initial_height = Robot_Config.InitialState.initial_height
 
         """初始化额外机器人参数"""
-        self.vel_cmd = torch.zeros((self.agents_num, 3), device=self.device)  # 速度指令
+        self.vel_cmd = torch.zeros((self.agents_num, 1), device=self.device)  # 速度指令,0表示暂停，1表示前进
         self.target_ori = torch.zeros((self.agents_num, 3), device=self.device)
         self.time = torch.zeros((self.agents_num, 1), device=self.device)
         self.L_feet_air_time = torch.zeros((self.agents_num, 1), device=self.device)  # 左脚离地时间
@@ -65,7 +65,7 @@ class Isaac_Lab_Environment:
         from ..Env.Scene_Initialization import env_setup
         self.sim, self.scene = env_setup(self.file_path, self.dt, self.sub_step, self.agents_num, self.device)
 
-    def prim_initialization(self, agent_index=None,reset_all = False):
+    def prim_initialization(self, agent_index=None, reset_all=False):
         """
         :param agent_index:  哪个序号的机器人挂了
         :return:
@@ -95,7 +95,10 @@ class Isaac_Lab_Environment:
 
         # 设置速度命令和时间
         """重新初始化额外机器人参数"""
-        self.vel_cmd[agent_index, 0] = 0
+        self.vel_cmd[agent_index] = torch.rand((num_agents, 1), device=self.device)
+        self.vel_cmd[agent_index] = (self.vel_cmd[agent_index] > 0.1).float() # 90%概率前进，10%概率原地不动
+
+
         self.time[agent_index] = 0
         self.L_feet_air_time[agent_index] = 0
         self.R_feet_air_time[agent_index] = 0
@@ -114,10 +117,9 @@ class Isaac_Lab_Environment:
         self.scene.write_data_to_sim()
         self.scene.update(dt=0)
 
-        if not self.train:  # 当你play的时候，设置速度指令
-            self.vel_cmd[:, 0] = -1.3
-
-
+    def resample_command(self):
+        self.vel_cmd = torch.rand((self.agents_num, 1), device=self.device)
+        self.vel_cmd = (self.vel_cmd > 0.1).float() # 90%概率前进，10%概率原地不动
 
     """-------------------以上均为初始化代码-----------------------"""
     """-------------------以上均为初始化代码-----------------------"""
@@ -154,6 +156,7 @@ class Isaac_Lab_Environment:
              self.sine_clock,
              self.cosine_clock,
              self.action,
+             self.vel_cmd,
              current_map
              ), dim=1)
 
@@ -205,6 +208,7 @@ class Isaac_Lab_Environment:
                                         self.sine_clock,
                                         self.cosine_clock,
                                         self.action,
+                                        self.vel_cmd,
                                         next_map), dim=1)
 
         # #——————————————————————获取下一时刻状态结束————————————————————————————————##
@@ -298,10 +302,13 @@ class Isaac_Lab_Environment:
                                                          self.next_linear_vel[:, 1],
                                                          self.next_body_ori[:, 2])
 
-        reward_vel_forward = -1 * torch.abs(vel_forward - 1.5) + 1.5
-        reward_vel_lateral = -0.5 * torch.abs(vel_lateral - 0)
+        if_tracking_vel = (self.vel_cmd == 1)
 
+        reward_vel_forward = -1 * torch.abs(vel_forward - 1.5 * if_tracking_vel) + 1.5
+        reward_vel_lateral = -0.5 * torch.abs(vel_lateral - 0)
         reward = reward_vel_lateral + reward_vel_forward
+
+
         return reward
 
     """高度跟踪"""
@@ -310,7 +317,7 @@ class Isaac_Lab_Environment:
 
         below_min = (self.next_body_height - self.next_min_foot_z) < 0.7
 
-        return -0.3*below_min + 0.3
+        return -0.3 * below_min + 0.3
 
     """方位角跟踪（ZYX）"""
 
@@ -352,9 +359,11 @@ class Isaac_Lab_Environment:
         double_support = self.next_L_foot_contact_situation & self.next_R_foot_contact_situation
         flying = (~self.next_L_foot_contact_situation) & (~self.next_R_foot_contact_situation)
 
-        walking_phase_reward = 0.2* single_support.float()
+        walking_phase_reward = 0.2 * single_support.float()
         walking_phase_reward += 0.2 * flying.float()
         walking_phase_reward += -0.3 * double_support.float()
+
+        walking_phase_reward *= (self.vel_cmd == 1)
         return walking_phase_reward.view(-1, 1)
 
     """鼓励脚悬空"""
@@ -372,7 +381,7 @@ class Isaac_Lab_Environment:
         feet_air_time += -0.05 * too_long
         self.L_feet_air_time *= (~self.next_L_foot_contact_situation)
         self.R_feet_air_time *= (~self.next_R_foot_contact_situation)
-        feet_air_time *= 2
+        feet_air_time *= 2*(self.vel_cmd == 1)
         return feet_air_time.view(-1, 1)
 
     def foot_safety_reward(self):
@@ -409,6 +418,7 @@ class Isaac_Lab_Environment:
         R_foot_step_reward += right_behind * (-0.1)
 
         foot_step_reward = L_foot_step_reward + R_foot_step_reward
+        foot_step_reward *= (self.vel_cmd == 1)
         return foot_step_reward
 
     """终止条件惩罚"""

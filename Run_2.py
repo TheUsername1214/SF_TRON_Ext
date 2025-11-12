@@ -16,6 +16,7 @@ import torch
 env.prim_initialization(reset_all=True)
 for epi in range(episode):
     print(f"===================episode: {epi}===================")
+    env.vel_cmd = env.sample_velocity_command()
     for step in range(maximum_step):
         """获取当前状态"""
 

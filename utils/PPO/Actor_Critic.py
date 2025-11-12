@@ -75,9 +75,6 @@ class Critic(BaseNetwork):
         return x
 
 
-
-
-
 """ Actor-Critic类 包含Actor和Critic网络 以及相关的优化器和经验回放缓冲区"""
 
 
@@ -119,17 +116,17 @@ class Actor_Critic:
         self.maximum_step = PPO_Config.PPOParam.maximum_step
         self.train = Env_Config.EnvParam.train
 
-        if self.batch_size>(self.agent_num*self.maximum_step):
-            self.batch_size=self.agent_num*self.maximum_step
+        if self.batch_size > (self.agent_num * self.maximum_step):
+            self.batch_size = self.agent_num * self.maximum_step
 
         # 初始化网络
-        self.actor = Actor(self.state_dim,self.ext_state_dim,
+        self.actor = Actor(self.state_dim, self.ext_state_dim,
                            self.actor_num_layers,
                            self.actuator_num,
                            self.action_scale,
                            self.std_scale).to(self.device)
 
-        self.critic = Critic(self.state_dim,self.ext_state_dim,
+        self.critic = Critic(self.state_dim, self.ext_state_dim,
                              self.critic_num_layers).to(self.device)
 
         # 初始化优化器
@@ -143,12 +140,10 @@ class Actor_Critic:
                                          self.maximum_step,
                                          self.device)
 
-        self.idx = [torch.randperm(self.maximum_step*self.agent_num,device = self.device)[:self.batch_size]
+        self.idx = [torch.randperm(self.maximum_step * self.agent_num, device=self.device)[:self.batch_size]
                     for _ in range(self.critic_update_frequency)]
 
         self.initial_reward_sum = -999
-
-
 
     def sample_action(self, state):
         """
@@ -163,14 +158,13 @@ class Actor_Critic:
         with torch.no_grad():
             mu, std = self.actor(state)
 
-
         if self.train:
             action = torch.normal(mu, std).clip(-1, 1)
         else:
             action = mu
         return action, action * self.action_scale
 
-    def store_experience(self, state,action, next_state, reward, over, current_step):
+    def store_experience(self, state, action, next_state, reward, over, current_step):
         """ 存储经验到缓冲区
         Args:
             state: 当前状态 (类型: torch.tensor, 形状: [agent_num, state_dim])
@@ -185,15 +179,23 @@ class Actor_Critic:
         self.Buffer.store_reward(reward, current_step)
         self.Buffer.store_over(over, current_step)
 
-    def update(self,previous_critic = None):
+    def update(self, previous_critic=None):
+
         # 获取经验数据
         buffer = self.Buffer
-        state = buffer.state_buffer.view(-1, self.state_dim+self.ext_state_dim)
+        state = buffer.state_buffer.view(-1, self.state_dim + self.ext_state_dim)
         action = buffer.action_buffer.view(-1, self.actuator_num)
-        next_state = buffer.next_state_buffer.view(-1, self.state_dim+self.ext_state_dim)
+        next_state = buffer.next_state_buffer.view(-1, self.state_dim + self.ext_state_dim)
         reward = buffer.reward_buffer.view(-1, 1)
         over = buffer.over_buffer.view(-1, 1)
         reward_sum = reward.mean().item()
+
+        self.save_each_epi_model()
+        if reward_sum > self.initial_reward_sum:
+            self.initial_reward_sum = reward_sum
+            self.save_best_model()
+            print(f"Best Model Saved")
+
         # 计算旧策略概率
         with torch.no_grad():
             mu_old, std_old = self.actor(state)
@@ -228,7 +230,7 @@ class Actor_Critic:
             new_prob = torch.distributions.Normal(mu, std).log_prob(a_batch).sum(dim=1, keepdim=True)
 
             # PPO损失
-            ratio = torch.exp(new_prob - old_prob_batch) # 括号里是对数
+            ratio = torch.exp(new_prob - old_prob_batch)  # 括号里是对数
             surr1 = ratio * gae_batch
             surr2 = ratio.clamp(1 - self.epsilon, 1 + self.epsilon) * gae_batch
 
@@ -239,16 +241,9 @@ class Actor_Critic:
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
-        print("std_mean",std_old.mean())
+        print("std_mean", std_old.mean())
         print(f"Experience Collected: {len(state)}, Critic Loss: {critic_loss:.4f}, Actor Loss: {actor_loss:.4f}")
         print("reward:", reward_sum)
-
-        self.save_each_epi_model()
-        if reward_sum > self.initial_reward_sum:
-            self.initial_reward_sum = reward_sum
-            self.save_best_model()
-            print(f"Best Model Saved")
-
 
 
 

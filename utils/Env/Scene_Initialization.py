@@ -2,7 +2,7 @@ import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
-from isaaclab.sensors import CameraCfg, ContactSensorCfg, RayCasterCfg, ImuCfg, patterns
+from isaaclab.sensors import CameraCfg, ContactSensorCfg, RayCasterCfg, ImuCfg, patterns,RayCasterCameraCfg
 from isaaclab.utils import configclass
 from isaaclab.terrains import TerrainImporter, TerrainImporterCfg, TerrainGeneratorCfg
 from isaaclab.terrains.height_field.hf_terrains_cfg import HfSteppingStonesTerrainCfg,HfRandomUniformTerrainCfg
@@ -123,6 +123,18 @@ def env_setup(file_path, dt, sub_step, agents_num, device):
             prim_path="{ENV_REGEX_NS}/Robot/ankle_R_Link",
             update_period=0,
         )
+
+        # Depth_Camera = RayCasterCameraCfg(
+        #     prim_path="{ENV_REGEX_NS}/Robot/Camera_Frame",
+        #     update_period=0,
+        #     mesh_prim_paths=["/World/defaultGroundPlane"],
+        #     max_distance=6,
+        #     depth_clipping_behavior="max",
+        #     debug_vis=True,
+        #     offset = RayCasterCameraCfg.OffsetCfg(convention = "world"),
+        #     pattern_cfg=patterns.PinholeCameraPatternCfg(width=11,
+        #                                                  height=16)
+        # )
 
     """初始化Isaac Sim 世界"""
     # 启动Isaac Sim 软件， 必须放在导入Isaac sim 库之前。
