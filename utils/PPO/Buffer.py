@@ -2,24 +2,22 @@ import torch
 
 
 class Agent_State_Buffer:
-    def __init__(self, state_dim,ext_state_dim, actuator_num, agent_num, max_step, device):
+    def __init__(self, state_dim, actuator_num, agent_num, max_step, device):
         self.state_dim = state_dim
-        self.ext_state_dim = ext_state_dim
         self.actuator_num = actuator_num
         self.agent_num = agent_num
         self.max_step = max_step
         self.device = device
-        self.state_buffer = torch.zeros((max_step, agent_num, state_dim+ext_state_dim), device=self.device)
+        self.state_buffer = torch.zeros((max_step, agent_num, state_dim), device=self.device)
         self.action_buffer = torch.zeros((max_step, agent_num, actuator_num), device=self.device)
-        self.next_state_buffer = torch.zeros((max_step, agent_num, state_dim+ext_state_dim), device=self.device)
+        self.next_state_buffer = torch.zeros((max_step, agent_num, state_dim), device=self.device)
         self.reward_buffer = torch.zeros((max_step, agent_num, 1), device=self.device)
         self.over_buffer = torch.zeros((max_step, agent_num, 1), device=self.device)
         self.GAE_buffer = torch.zeros((max_step, agent_num, 1), device=self.device)
 
-    def compute_GAE(self,critic_net,gamma,lam):
-
+    def compute_GAE(self, critic_net, gamma, lam):
         with torch.no_grad():
-            target_value =self.reward_buffer + \
+            target_value = self.reward_buffer + \
                            (1 - self.over_buffer) * gamma * critic_net(self.next_state_buffer)
 
             current_value = critic_net(self.state_buffer)
@@ -28,11 +26,11 @@ class Agent_State_Buffer:
         advantage = 0
         index = -1
         for delta in GAE.flip(0):
-            advantage = gamma * lam * advantage*(1-self.over_buffer[index]) + delta
+            advantage = gamma * lam * advantage * (1 - self.over_buffer[index]) + delta
             self.GAE_buffer[index] = advantage
             index += -1
 
-        self.GAE_buffer = (self.GAE_buffer-self.GAE_buffer.mean())/self.GAE_buffer.std()
+        self.GAE_buffer = (self.GAE_buffer - self.GAE_buffer.mean()) / self.GAE_buffer.std()
 
     def store_state(self, current_state, current_step):
         self.state_buffer[current_step] = current_state

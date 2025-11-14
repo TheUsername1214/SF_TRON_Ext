@@ -1,10 +1,10 @@
 class Env_Config:
     class EnvParam:  # 训练环境的参数
-        agents_num = 2500
+        agents_num = 2000
         agents_num_in_play = 10
         file_path = "C:/Users/21363/PycharmProjects/Isaac_Lab/SF_TRON_Ext/model/Robot_Model/SF_TRON1A.usd"  # abs path, not relative path
-        dt = 0.02
-        sub_step = 4
+        dt = 0.025
+        sub_step = 5
         friction_coef = 1
         device = 'cuda'
         backend = "torch"
@@ -36,8 +36,7 @@ class Robot_Config:
 
 class PPO_Config:
     class CriticParam:  # Critic 神经网络 参数
-        state_dim = 33 # 机器人本体与外部指令感知
-        extra_dim = 17 * 11 # 外部环境感知
+        state_dim = 33 + 17 * 11 # 机器人本体与外部指令感知
         critic_layers_num = 256
         critic_lr = 3e-4
         critic_update_frequency = 200

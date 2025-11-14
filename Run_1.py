@@ -5,7 +5,6 @@ from utils.Config.Config import *
 maximum_step = PPO_Config.PPOParam.maximum_step
 episode = PPO_Config.PPOParam.episode
 train = Env_Config.EnvParam.train
-basic_state = PPO_Config.CriticParam.state_dim
 AC = Actor_Critic(PPO_Config, Env_Config)
 if not train:
     AC.load_best_model()
@@ -22,14 +21,14 @@ for epi in range(episode):
 
         if not train:
             env.vel_cmd[:] = 1
-            if epi>2:
+            if epi>3:
                 env.vel_cmd[:] = 0
                 print("stop!!!!!!!")
         state = env.get_current_observations()
-        state[:,basic_state:] = 0 # basic state 之后就是地图信息，第一阶段机器人盲走
+        state[:,33:] = 0  # basic state 之后就是地图信息，第一阶段机器人盲走
 
         """做动作"""
-        action, scaled_action = AC.sample_action(state)
+        action, scaled_action = AC.sample_action(state,deterministic=not train)
 
         """更新环境"""
         env.update_world(action=scaled_action)
@@ -37,7 +36,7 @@ for epi in range(episode):
         """获取下一个状态"""
 
         next_state = env.get_next_observations()
-        next_state[:, basic_state:] = 0
+        next_state[:, 33:] = 0
 
         """计算奖励 判断是否结束"""
 

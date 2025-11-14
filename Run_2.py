@@ -16,19 +16,19 @@ import torch
 env.prim_initialization(reset_all=True)
 for epi in range(episode):
     print(f"===================episode: {epi}===================")
-    env.vel_cmd = env.sample_velocity_command()
+    env.resample_command()
     for step in range(maximum_step):
         """获取当前状态"""
 
         state = env.get_current_observations()
 
         state_trained = state.clone()
-        state_trained[:,32:] = 0
+        state_trained[:,33:] = 0
 
         """做动作"""
 
-        action1, scaled_action1 = AC_trained.sample_action(state_trained)
-        action2, scaled_action2 = AC.sample_action(state)
+        action1, scaled_action1 = AC_trained.sample_action(state_trained,deterministic=True)
+        action2, scaled_action2 = AC.sample_action(state,deterministic=not train)
 
         """更新环境"""
         env.update_world(action=scaled_action1*0.25+scaled_action2*0.75)

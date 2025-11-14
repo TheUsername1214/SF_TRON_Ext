@@ -96,8 +96,7 @@ class Isaac_Lab_Environment:
         # 设置速度命令和时间
         """重新初始化额外机器人参数"""
         self.vel_cmd[agent_index] = torch.rand((num_agents, 1), device=self.device)
-        self.vel_cmd[agent_index] = (self.vel_cmd[agent_index] > 0.1).float() # 90%概率前进，10%概率原地不动
-
+        self.vel_cmd[agent_index] = (self.vel_cmd[agent_index] > 0.1).float()  # 90%概率前进，10%概率原地不动
 
         self.time[agent_index] = 0
         self.L_feet_air_time[agent_index] = 0
@@ -119,7 +118,8 @@ class Isaac_Lab_Environment:
 
     def resample_command(self):
         self.vel_cmd = torch.rand((self.agents_num, 1), device=self.device)
-        self.vel_cmd = (self.vel_cmd > 0.1).float() # 90%概率前进，10%概率原地不动
+        self.vel_cmd = (self.vel_cmd > 0.1).float()  # 90%概率前进，10%概率原地不动
+
 
     """-------------------以上均为初始化代码-----------------------"""
     """-------------------以上均为初始化代码-----------------------"""
@@ -144,8 +144,8 @@ class Isaac_Lab_Environment:
         clock_signal = 2 * torch.pi * self.time
         self.sine_clock = torch.sin(clock_signal)
         self.cosine_clock = torch.cos(clock_signal)
-        body_height = self.body_pos[:, 2].view(-1, 1)
-        current_map = self.scene["height_scanner"].data.ray_hits_w[:, :, -1] - body_height + 0.85
+
+        current_map = self.scene["height_scanner"].data.ray_hits_w[:, :, -1]
 
         # 拼接出下一时刻状态空间张量，并归一化
         current_state = torch.concatenate(
@@ -197,8 +197,7 @@ class Isaac_Lab_Environment:
         self.sine_clock = torch.sin(clock_signal)
         self.cosine_clock = torch.cos(clock_signal)
 
-        body_height = self.next_body_pos[:, 2].view(-1, 1)
-        next_map = self.scene["height_scanner"].data.ray_hits_w[:, :, -1] - body_height + 0.85
+        next_map = self.scene["height_scanner"].data.ray_hits_w[:, :, -1]
 
         # 拼接出下一时刻状态空间张量，并归一化
         next_state = torch.concatenate((self.next_joint_pos,
@@ -216,7 +215,8 @@ class Isaac_Lab_Environment:
         # #——————————————————————获取额外机器人状态————————————————————————————————##
         # 获得机器人body高度 和 Abad 关节角度
         self.next_body_height = self.next_body_pos[:, 2].view(-1, 1)
-        L_foot_pos, R_foot_pos = self.scene["L_imu_sensor"].data.pos_w, self.scene["R_imu_sensor"].data.pos_w
+        L_foot_pos, R_foot_pos = (self.scene["L_imu_sensor"].data.pos_w,
+                                  self.scene["R_imu_sensor"].data.pos_w)
 
         self.next_L_foot_forward, self.next_L_foot_lateral = self.yaw_transforming(L_foot_pos[:, 0],
                                                                                    L_foot_pos[:, 1],
@@ -232,11 +232,6 @@ class Isaac_Lab_Environment:
         self.next_linear_vel = self.scene["robot"].data.root_lin_vel_w
         L_foot_contact_force = self.scene["L_contact_sensor"].data.net_forces_w[:, 0, 2].view(-1, 1)
         R_foot_contact_force = self.scene["R_contact_sensor"].data.net_forces_w[:, 0, 2].view(-1, 1)
-
-        self.L_foot_contact_force_xy = self.scene["L_contact_sensor"].data.net_forces_w[:, 0, :2]
-        self.R_foot_contact_force_xy = self.scene["R_contact_sensor"].data.net_forces_w[:, 0, :2]
-        self.L_foot_contact_force_z = self.scene["L_contact_sensor"].data.net_forces_w[:, 0, 2].view(-1, 1)
-        self.R_foot_contact_force_z = self.scene["R_contact_sensor"].data.net_forces_w[:, 0, 2].view(-1, 1)
 
         self.next_L_foot_contact_situation = L_foot_contact_force > 1e-5
         self.next_R_foot_contact_situation = R_foot_contact_force > 1e-5
@@ -308,7 +303,6 @@ class Isaac_Lab_Environment:
         reward_vel_lateral = -0.5 * torch.abs(vel_lateral - 0)
         reward = reward_vel_lateral + reward_vel_forward
 
-
         return reward
 
     """高度跟踪"""
@@ -337,7 +331,6 @@ class Isaac_Lab_Environment:
     def foot_constraint_reward(self):
         foot_regularization_reward = -0.2 * (
                 torch.abs(self.next_L_foot_lateral - self.next_R_foot_lateral) < 0.1).float()
-        # foot_regularization_reward += -0.2 * self.next_joint_pos[:, :2].abs().sum(dim=-1, keepdim=True) #给第一次用
         foot_regularization_reward += -0.01 * self.next_joint_pos[:, :2].abs().sum(dim=-1, keepdim=True)
 
         return foot_regularization_reward
@@ -360,10 +353,10 @@ class Isaac_Lab_Environment:
         flying = (~self.next_L_foot_contact_situation) & (~self.next_R_foot_contact_situation)
 
         walking_phase_reward = 0.2 * single_support.float()
-        walking_phase_reward += 0 * flying.float()
+        walking_phase_reward += -0.3 * flying.float()
         walking_phase_reward += -0.3 * double_support.float()
 
-        walking_phase_reward *= (self.vel_cmd == 1)
+        walking_phase_reward *= 1
         return walking_phase_reward.view(-1, 1)
 
     """鼓励脚悬空"""
@@ -381,18 +374,10 @@ class Isaac_Lab_Environment:
         feet_air_time += -0.05 * too_long
         self.L_feet_air_time *= (~self.next_L_foot_contact_situation)
         self.R_feet_air_time *= (~self.next_R_foot_contact_situation)
-        feet_air_time *= 2*(self.vel_cmd == 1)
+        feet_air_time *= 2
         return feet_air_time.view(-1, 1)
 
     def foot_safety_reward(self):
-        # L_touching_ground = self.next_L_foot_contact_situation & (~self.L_foot_contact_situation)
-        # R_touching_ground = self.next_R_foot_contact_situation & (~self.R_foot_contact_situation)
-        # L_foot_map = self.scene["L_height_scanner"].data.ray_hits_w[:, :, -1]*1000
-        # R_foot_map = self.scene["R_height_scanner"].data.ray_hits_w[:, :, -1]*1000
-        #
-        # L_foot_map_std = torch.std(L_foot_map, dim=1, keepdim=True)*L_touching_ground
-        # R_foot_map_std = torch.std(R_foot_map, dim=1, keepdim=True)*R_touching_ground
-        # foot_safety = -1*(L_foot_map_std+R_foot_map_std).clip(0,2)
 
         feet_clearance = (((self.next_L_foot_z - self.next_min_foot_z) - 0.15) ** 2 *
                           (self.next_L_foot_forward - self.L_foot_forward).abs() / self.dt)
@@ -460,7 +445,7 @@ class Isaac_Lab_Environment:
         self.foot_air_time_reward_sum += self.foot_air_time_reward().mean().item() / self.max_step
         self.Termination_reward_sum += self.Termination_reward().mean().item() / self.max_step
 
-        return reward, self.over.float(), (self.time > 10).float()
+        return reward, self.over.float(), (self.time > 20).float()
 
     def print_reward_sum(self):
         print(f"vel_tracking_reward_sum: {self.vel_tracking_reward_sum:.4f}")

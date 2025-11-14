@@ -1,5 +1,3 @@
-import torch
-
 from ..PPO.Buffer import *
 
 """ PPO算法的Actor-Critic网络结构
@@ -7,38 +5,20 @@ Actor: 输入状态 输出动作的均值和标准差"""
 
 
 class BaseNetwork(torch.nn.Module):
-    def __init__(self, state_dim, ext_state_dim, num_layers):
+    def __init__(self, state_dim, num_layers):
         super(BaseNetwork, self).__init__()
         self.state_dim = state_dim
         self.num_layers = num_layers
 
-        # 共享的映射网络
-        self.fc_map_1 = torch.nn.Linear(ext_state_dim, self.num_layers)
-        self.fc_map_2 = torch.nn.Linear(self.num_layers, self.num_layers)
-        self.fc_map_3 = torch.nn.Linear(self.num_layers, 30)
 
         # 共享的主干网络
-        self.fc1_x = torch.nn.Linear(self.state_dim + 30, self.num_layers)
+        self.fc1_x = torch.nn.Linear(self.state_dim, self.num_layers)
         self.fc2_x = torch.nn.Linear(self.num_layers, self.num_layers)
         self.fc3_x = torch.nn.Linear(self.num_layers, self.num_layers)
 
     def process_input(self, input_):
         """处理输入，提取状态和地图特征"""
-        if input_.dim() == 3:
-            state = input_[:, :, :self.state_dim]
-            map_data = input_[:, :, self.state_dim:]
-        else:
-            state = input_[:, :self.state_dim]
-            map_data = input_[:, self.state_dim:]
-
-        # 处理地图数据
-        map_feat = torch.nn.functional.elu(self.fc_map_1(map_data))
-        map_feat = torch.nn.functional.elu(self.fc_map_2(map_feat))
-        map_feat = torch.nn.functional.tanh(self.fc_map_3(map_feat))
-
-        # 合并状态和地图特征
-        x = torch.cat([state, map_feat], dim=-1)
-
+        x = input_
         # 通过主干网络
         x = torch.nn.functional.elu(self.fc1_x(x))
         x = torch.nn.functional.elu(self.fc2_x(x))
@@ -48,8 +28,8 @@ class BaseNetwork(torch.nn.Module):
 
 
 class Actor(BaseNetwork):
-    def __init__(self, state_dim, ext_state_dim, num_layers, actuator_num, action_scale=1, std_scale=1):
-        super(Actor, self).__init__(state_dim, ext_state_dim, num_layers)
+    def __init__(self, state_dim, num_layers, actuator_num, action_scale=1, std_scale=1):
+        super(Actor, self).__init__(state_dim, num_layers)
         self.actuator_num = actuator_num
         self.act_scale = action_scale
         self.std_scale = std_scale
@@ -65,8 +45,8 @@ class Actor(BaseNetwork):
 
 
 class Critic(BaseNetwork):
-    def __init__(self, state_dim, ext_state_dim, num_layers):
-        super(Critic, self).__init__(state_dim, ext_state_dim, num_layers)
+    def __init__(self, state_dim, num_layers):
+        super(Critic, self).__init__(state_dim, num_layers)
         self.fc4_x = torch.nn.Linear(self.num_layers, 1)
 
     def forward(self, input_):
@@ -97,7 +77,6 @@ class Actor_Critic:
 
         # state parameter
         self.state_dim = PPO_Config.CriticParam.state_dim
-        self.ext_state_dim = PPO_Config.CriticParam.extra_dim
         self.critic_num_layers = PPO_Config.CriticParam.critic_layers_num
         self.critic_update_frequency = PPO_Config.CriticParam.critic_update_frequency
         self.critic_lr = PPO_Config.CriticParam.critic_lr
@@ -120,13 +99,13 @@ class Actor_Critic:
             self.batch_size = self.agent_num * self.maximum_step
 
         # 初始化网络
-        self.actor = Actor(self.state_dim, self.ext_state_dim,
+        self.actor = Actor(self.state_dim,
                            self.actor_num_layers,
                            self.actuator_num,
                            self.action_scale,
                            self.std_scale).to(self.device)
 
-        self.critic = Critic(self.state_dim, self.ext_state_dim,
+        self.critic = Critic(self.state_dim,
                              self.critic_num_layers).to(self.device)
 
         # 初始化优化器
@@ -134,7 +113,6 @@ class Actor_Critic:
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
 
         self.Buffer = Agent_State_Buffer(self.state_dim,
-                                         self.ext_state_dim,
                                          self.actuator_num,
                                          self.agent_num,
                                          self.maximum_step,
@@ -145,7 +123,7 @@ class Actor_Critic:
 
         self.initial_reward_sum = -999
 
-    def sample_action(self, state):
+    def sample_action(self, state, deterministic=True):
         """
         根据状态获取动作 用于与环境交互
         Args:
@@ -158,10 +136,11 @@ class Actor_Critic:
         with torch.no_grad():
             mu, std = self.actor(state)
 
-        if self.train:
-            action = torch.normal(mu, std).clip(-1, 1)
-        else:
+        if deterministic:
             action = mu
+
+        else:
+            action = torch.normal(mu, std).clip(-1, 1)
         return action, action * self.action_scale
 
     def store_experience(self, state, action, next_state, reward, over, current_step):
@@ -183,9 +162,9 @@ class Actor_Critic:
 
         # 获取经验数据
         buffer = self.Buffer
-        state = buffer.state_buffer.view(-1, self.state_dim + self.ext_state_dim)
+        state = buffer.state_buffer.view(-1, self.state_dim)
         action = buffer.action_buffer.view(-1, self.actuator_num)
-        next_state = buffer.next_state_buffer.view(-1, self.state_dim + self.ext_state_dim)
+        next_state = buffer.next_state_buffer.view(-1, self.state_dim)
         reward = buffer.reward_buffer.view(-1, 1)
         over = buffer.over_buffer.view(-1, 1)
         reward_sum = reward.mean().item()
@@ -244,8 +223,6 @@ class Actor_Critic:
         print("std_mean", std_old.mean())
         print(f"Experience Collected: {len(state)}, Critic Loss: {critic_loss:.4f}, Actor Loss: {actor_loss:.4f}")
         print("reward:", reward_sum)
-
-
 
     def save_best_model(self):
         torch.save(self.actor.state_dict(), f'model/NN_Model/actor{self.index}.pth')

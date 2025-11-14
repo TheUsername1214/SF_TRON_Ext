@@ -2,10 +2,10 @@ import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
-from isaaclab.sensors import CameraCfg, ContactSensorCfg, RayCasterCfg, ImuCfg, patterns,RayCasterCameraCfg
+from isaaclab.sensors import CameraCfg, ContactSensorCfg, RayCasterCfg, ImuCfg, patterns, RayCasterCameraCfg
 from isaaclab.utils import configclass
 from isaaclab.terrains import TerrainImporter, TerrainImporterCfg, TerrainGeneratorCfg
-from isaaclab.terrains.height_field.hf_terrains_cfg import HfSteppingStonesTerrainCfg,HfRandomUniformTerrainCfg
+from isaaclab.terrains.height_field.hf_terrains_cfg import HfSteppingStonesTerrainCfg, HfRandomUniformTerrainCfg
 from isaaclab.sim import DomeLightCfg
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 import numpy as np
@@ -22,18 +22,18 @@ def env_setup(file_path, dt, sub_step, agents_num, device):
             # sub_terrains[f"stepping_stone_{i + 1}_{j + 1}"] = HfSteppingStonesTerrainCfg(
             #     proportion=1.0,
             #     border_width=0.1,
-            #     holes_depth=-0.8, # 这个不能给高，不然碰撞计算要花很久
+            #     holes_depth=-0.3,  # 这个不能给高，不然碰撞计算要花很久
             #     stone_height_max=0,
-            #     stone_width_range=(0.4,0.8),
+            #     stone_width_range=(0.5, 0.8),
             #     stone_distance_range=(0.1, distance[j]),
             #     platform_width=0.8,
             # )
             sub_terrains[f"flat_plane_{i + 1}_{j + 1}"] = HfRandomUniformTerrainCfg(
                 proportion=1.0,
                 border_width=0.1,
-                noise_range=(-heights[i]/10, heights[i]/10),
-                noise_step = 0.01,
-                )
+                noise_range=(-heights[i] / 10, heights[i] / 10),
+                noise_step=0.01,
+            )
 
     num_row = 20
 
